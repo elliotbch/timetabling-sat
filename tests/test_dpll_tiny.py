@@ -1,4 +1,3 @@
-# tests/test_dpll_tiny.py
 from solver.cnf import CNF
 from solver.dpll import dpll
 

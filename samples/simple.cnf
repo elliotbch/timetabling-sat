@@ -1,0 +1,5 @@
+c Simple satisfiable CNF: (x1) AND (x1 v ¬x2) AND (x2 v x3)
+p cnf 3 3
+1 0
+1 -2 0
+2 3 0

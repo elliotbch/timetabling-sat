@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Iterable
+from typing import Dict
 
 Literal = int   
 Clause  = List[int]
@@ -46,3 +47,18 @@ def parse_dimacs(text: str) -> CNF:
 def parse_dimacs_file(path: str) -> CNF:
     with open(path, "r", encoding="utf-8") as f:
         return parse_dimacs(f.read())
+
+def clause_satisfied(clause: Clause, model: Dict[int, bool]) -> bool:
+   
+    for l in clause:
+        v = abs(l)
+        val = model.get(v, None)
+        if val is None:
+            continue
+        if (l > 0 and val) or (l < 0 and not val):
+            return True
+    return False
+
+def formula_satisfied(cnf: CNF, model: Dict[int, bool]) -> bool:
+    
+    return all(clause_satisfied(cl, model) for cl in cnf.clauses)

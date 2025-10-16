@@ -1,0 +1,2 @@
+python-sat[pblib,aiger]>=0.1.7.dev26
+z3-solver>=4.12

@@ -15,7 +15,14 @@ class Event:
 class Trace(List[Event]):
     pass
 
-def _unit_propagate(clauses: List[Clause], assign: Assignment, trace: Optional[Trace]) -> Tuple[Optional[List[Clause]], bool]:
+@dataclass
+class Stats:
+    decisions: int = 0
+    propagations: int = 0
+    backtracks: int = 0
+
+def _unit_propagate(clauses: List[Clause], assign: Assignment,
+                    trace: Optional[Trace], stats: Optional[Stats]) -> Tuple[Optional[List[Clause]], bool]:
     changed = True
     while changed:
         changed = False
@@ -31,6 +38,8 @@ def _unit_propagate(clauses: List[Clause], assign: Assignment, trace: Optional[T
                     return None, True
                 continue
             assign[var] = val
+            if stats is not None:
+                stats.propagations += 1
             if trace is not None:
                 trace.append(Event("unit", var=var, val=val))
             changed = True
@@ -50,7 +59,8 @@ def _unit_propagate(clauses: List[Clause], assign: Assignment, trace: Optional[T
             clauses = new_clauses
     return clauses, False
 
-def _pure_literal_elimination(clauses: List[Clause], assign: Assignment, trace: Optional[Trace]) -> Tuple[List[Clause], bool]:
+def _pure_literal_elimination(clauses: List[Clause], assign: Assignment,
+                              trace: Optional[Trace], stats: Optional[Stats]) -> Tuple[List[Clause], bool]:
     if not clauses:
         return clauses, False
     polarity = {}
@@ -69,6 +79,8 @@ def _pure_literal_elimination(clauses: List[Clause], assign: Assignment, trace: 
     for v, val in pures:
         assign[v] = val
         satisfied.add(v if val else -v)
+        if stats is not None:
+            stats.propagations += 1
         if trace is not None:
             trace.append(Event("pure", var=v, val=val))
     new_clauses: List[Clause] = []
@@ -78,9 +90,8 @@ def _pure_literal_elimination(clauses: List[Clause], assign: Assignment, trace: 
         new_clauses.append(cl)
     return new_clauses, True
 
-# ---------- (OPTIONNEL) Heuristique DLIS-lite ----------
+# ---------- Heuristique DLIS-lite ----------
 def _dlis_lite_choice(clauses: List[Clause], assign: Assignment) -> Tuple[int, bool]:
-    
     pos_count: Dict[int, int] = {}
     neg_count: Dict[int, int] = {}
     for cl in clauses:
@@ -94,7 +105,6 @@ def _dlis_lite_choice(clauses: List[Clause], assign: Assignment) -> Tuple[int, b
                 neg_count[v] = neg_count.get(v, 0) + 1
     if not pos_count and not neg_count:
         return 0, True
-    # score = max(polarity count)
     best_v = 0
     best_pol_true = True
     best_score = -1
@@ -115,24 +125,27 @@ def _choose_unassigned(clauses: List[Clause], assign: Assignment, use_heuristic:
         v, pol = _dlis_lite_choice(clauses, assign)
         if v != 0:
             return v, pol
-
     for cl in clauses:
         for l in cl:
             v = abs(l)
             if v not in assign:
                 return v, True
     return 0, True
-# ------------------------------------------------------
+# ------------------------------------------
 
-def dpll(cnf: CNF, trace: Optional[Trace] = None, use_heuristic: bool = True) -> Tuple[bool, Assignment]:
+def dpll(cnf: CNF, trace: Optional[Trace] = None, use_heuristic: bool = True,
+         stats: Optional[Stats] = None) -> Tuple[bool, Assignment]:
     clauses = [cl[:] for cl in cnf.clauses]
     assign: Assignment = {}
-    sat, model = _dpll_rec(clauses, assign, trace, use_heuristic)
+    if stats is None:
+        stats = Stats()
+    sat, model = _dpll_rec(clauses, assign, trace, use_heuristic, stats)
     return sat, model
 
-def _dpll_rec(clauses: List[Clause], assign: Assignment, trace: Optional[Trace], use_heuristic: bool) -> Tuple[bool, Assignment]:
+def _dpll_rec(clauses: List[Clause], assign: Assignment, trace: Optional[Trace],
+              use_heuristic: bool, stats: Stats) -> Tuple[bool, Assignment]:
     while True:
-        clauses, conflict = _unit_propagate(clauses, assign, trace)
+        clauses, conflict = _unit_propagate(clauses, assign, trace, stats)
         if conflict:
             return False, {}
         if clauses is None:
@@ -141,7 +154,7 @@ def _dpll_rec(clauses: List[Clause], assign: Assignment, trace: Optional[Trace],
             if trace is not None:
                 trace.append(Event("sat"))
             return True, assign.copy()
-        clauses, changed = _pure_literal_elimination(clauses, assign, trace)
+        clauses, changed = _pure_literal_elimination(clauses, assign, trace, stats)
         if not changed:
             break
     v, preferred = _choose_unassigned(clauses, assign, use_heuristic)
@@ -149,9 +162,10 @@ def _dpll_rec(clauses: List[Clause], assign: Assignment, trace: Optional[Trace],
         if trace is not None:
             trace.append(Event("sat"))
         return True, assign.copy()
-    
     for val in (preferred, not preferred):
         assign[v] = val
+        if stats is not None:
+            stats.decisions += 1
         if trace is not None:
             trace.append(Event("decide", var=v, val=val))
         pos = v if val else -v
@@ -172,9 +186,11 @@ def _dpll_rec(clauses: List[Clause], assign: Assignment, trace: Optional[Trace],
             else:
                 new_clauses.append(cl)
         if not bad:
-            sat, model = _dpll_rec(new_clauses, assign, trace, use_heuristic)
+            sat, model = _dpll_rec(new_clauses, assign, trace, use_heuristic, stats)
             if sat:
                 return True, model
+        if stats is not None:
+            stats.backtracks += 1
         if trace is not None:
             trace.append(Event("backtrack", var=v, val=val))
         del assign[v]

@@ -1,4 +1,3 @@
-# experiments/reproduce_all.py
 #!/usr/bin/env python3
 import os, sys, subprocess, argparse
 

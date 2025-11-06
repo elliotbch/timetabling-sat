@@ -62,8 +62,7 @@ cd timetabling-sat
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-Usage
-Solve a CNF file
+
 
 python -m scripts.solve_cnf samples/simple.cnf --model
  Run the timetabling encoder (standalone CLI)

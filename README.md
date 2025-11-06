@@ -141,7 +141,7 @@ PySAT and Z3 are faster, but the goal here is conceptual correctness and transpa
 All experiments can be fully reproduced with one command:
 
 
-python experiments/reproduce_all.py --seed 20251003
+python experiments/reproduce_all.py --seed 123456
 This regenerates:
 
 CNF encodings (S, M, L)
